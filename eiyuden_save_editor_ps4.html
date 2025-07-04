@@ -862,11 +862,28 @@
             const hotSpringEvents = gameData._hotSpringData?._readEventIds?.join(', ') || 'Nenhum evento registrado.';
             const openedChests = gameData._fieldAction?._treasureChestList?._opened?.join(', ') || 'Nenhum baú aberto.';
 
+            let materialsHTML = '';
+            if (gameData._fortressTown && gameData._fortressTown._itemList) {
+                gameData._fortressTown._itemList.forEach((item, index) => {
+                    if (MATERIALS_DB[item._id]) {
+                        materialsHTML += `
+                            <div class="item-card" data-name="${MATERIALS_DB[item._id]}">
+                                <h4>${MATERIALS_DB[item._id]}</h4>
+                                <div class="card-content" style="padding: 15px;">
+                                    <label for="material-${item._id}">Quantidade</label>
+                                    <input type="number" id="material-${item._id}" class="form-control" value="${item._count}" data-path="_fortressTown._itemList.${index}._count">
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+            }
+
             container.innerHTML = `
                 <div class="section">
-                    <div class="section-header">🏰 Informações do QG</div>
+                    <div class="section-header">🏰 Informações e Recursos do QG</div>
                     <div class="section-content">
-                         <div class="form-grid">
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 20px;">
                             <div class="form-group">
                                 <label for="fortressLevel">Nível do QG</label>
                                 <input type="number" id="fortressLevel" class="form-control" data-path="_fortressTown._fortressTownLevel" value="${gameData._fortressTown?._fortressTownLevel || 0}">
@@ -876,6 +893,15 @@
                                 <input type="number" id="fortressPopulation" class="form-control" data-path="_fortressTown._population" value="${gameData._fortressTown?._population || 0}">
                             </div>
                         </div>
+                        <hr style="margin: 20px 0;">
+                        <h4>Recursos do QG</h4>
+                        <div class="quick-actions" style="margin-top: 15px;">
+                            <button class="btn btn-primary" onclick="addAndMaxAllFortressMaterials()">🪵 Adicionar e Maximizar Todos</button>
+                            <button class="btn btn-danger" onclick="removeAllFortressMaterials()">🗑️ Remover Todos</button>
+                        </div>
+                        <div class="item-grid" style="max-height: 400px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                            ${materialsHTML || '<p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">Nenhum recurso do QG encontrado no armazém.</p>'}
+                        </div>
                     </div>
                 </div>
 
@@ -884,7 +910,6 @@
                     <div class="section-content">
                         <div class="quick-actions">
                             <button class="btn btn-primary" onclick="addAllRecipes()">🍳 Adicionar Todas as Receitas</button>
-                            <button class="btn btn-primary" onclick="maxFortressResources()">🪵 Maximizar Recursos do QG</button>
                         </div>
                     </div>
                 </div>
@@ -1469,24 +1494,40 @@
             renderInventoryTab();
         }
 
-        function maxFortressResources() {
-            if (!gameData._fortressTown?._itemList) {
-                gameData._fortressTown = { _itemList: [] };
-            };
+        // --- NOVAS FUNÇÕES PARA RECURSOS DO QG ---
 
-            const resourceIds = [50001, 50002, 50003, 50004];
-            const existingResources = new Map(gameData._fortressTown._itemList.map(item => [item._id, item]));
+        function addAndMaxAllFortressMaterials() {
+            if (!confirm("Isso adicionará todos os recursos do QG (madeira, pedra, etc.) que você não possui e definirá a quantidade de todos eles para 9999. Deseja continuar?")) return;
+            
+            if (!gameData._fortressTown) gameData._fortressTown = { _itemList: [] };
+            if (!gameData._fortressTown._itemList) gameData._fortressTown._itemList = [];
 
-            resourceIds.forEach(id => {
-                if (existingResources.has(id)) {
-                    existingResources.get(id)._count = 9999;
+            const existingMaterials = new Map(gameData._fortressTown._itemList.map(item => [item._id, item]));
+
+            Object.keys(MATERIALS_DB).forEach(idStr => {
+                const id = parseInt(idStr);
+                if (existingMaterials.has(id)) {
+                    existingMaterials.get(id)._count = 9999;
                 } else {
-                    gameData._fortressTown._itemList.push({_id: id, _count: 9999, _max: 9999});
+                    gameData._fortressTown._itemList.push({ _id: id, _count: 9999, _max: 9999 });
                 }
             });
 
-            showStatus('Recursos do QG maximizados!', 'success');
+            showStatus('Todos os recursos do QG foram adicionados e maximizados!', 'success');
+            renderFortressTab();
         }
+
+        function removeAllFortressMaterials() {
+            if (!confirm("⚠️ ATENÇÃO: Isso removerá TODOS os recursos do QG (madeira, pedra, pelagem, etc.) do seu armazém. Itens normais não serão afetados. Deseja continuar?")) return;
+            
+            if (gameData._fortressTown && gameData._fortressTown._itemList) {
+                gameData._fortressTown._itemList = gameData._fortressTown._itemList.filter(item => !MATERIALS_DB[item._id]);
+            }
+
+            showStatus('Todos os recursos do QG foram removidos do armazém.', 'success');
+            renderFortressTab();
+        }
+
 
         function openAlmostAllChests() {
              if(confirm("Isso marcará todos os baús da lista como abertos. Deseja continuar?")) {
